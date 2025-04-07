@@ -1,144 +1,150 @@
-import React, { useEffect, useRef, useState } from "react";
-import { useAuthState } from "react-firebase-hooks/auth";
+import { useEffect, useState } from "react";
 import {
   collection,
   query,
+  where,
   orderBy,
   onSnapshot,
   addDoc,
   serverTimestamp,
-  Timestamp,
 } from "firebase/firestore";
-import { auth, db } from "../firebase";
-import { MessageCircle } from "lucide-react";
-import { MessageType, Contact } from "../types";
-import Picker, { EmojiClickData } from "emoji-picker-react";
+import { auth, db } from "../firebase"; // Adjust if your path is different
+import { format } from "date-fns";
+import { Message } from "../types"; // ✅ Use the interface you just added
+import { Contact } from "../types";
+import Picker, { EmojiClickData } from "emoji-picker-react"; // Import from emoji-picker-react
 
-interface Props {
+interface ChatAreaProps {
   selectedContact: Contact;
 }
 
-const ChatArea: React.FC<Props> = ({ selectedContact }) => {
-  const [user] = useAuthState(auth);
-  const [message, setMessage] = useState<string>("");
-  const [messages, setMessages] = useState<MessageType[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+const ChatArea: React.FC<ChatAreaProps> = ({ selectedContact }) => {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState<string>("");
   const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
-  const [isTyping, setIsTyping] = useState<boolean>(false); // This tracks if the user is typing
 
+  // Fetch messages from Firestore
   useEffect(() => {
-    const q = query(collection(db, "messages"), orderBy("createdAt"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const allMessages = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as MessageType));
-      const filtered = allMessages.filter(
-        (msg) =>
-          (msg.uid === user?.uid && msg.receiverId === selectedContact.id) ||
-          (msg.uid === selectedContact.id && msg.receiverId === user?.uid)
-      );
-      setMessages(filtered);
-    });
+    if (!selectedContact) return;
+
+    const q = query(
+      collection(db, "messages"),
+      where("receiverId", "==", selectedContact.id),
+      orderBy("createdAt", "asc")
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const messages: Message[] = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            text: data.text,
+            uid: data.uid,
+            receiverId: data.receiverId,
+            createdAt: data.createdAt,
+          };
+        });
+        setMessages(messages);
+      },
+      (error) => {
+        console.error("Error loading messages:", error);
+      }
+    );
 
     return () => unsubscribe();
-  }, [selectedContact, user]);
+  }, [selectedContact]);
 
-  const sendMessage = async (e: React.FormEvent) => {
+  // Handle sending a new message
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim() === "" || !user) return;
+    if (newMessage.trim() === "") return;
 
-    const messageData = {
-      text: message,
-      uid: user.uid,
-      name: user.displayName,
-      photo: user.photoURL,
-      createdAt: serverTimestamp() as Timestamp,
-      receiverId: selectedContact.id,
-    };
-
-    await addDoc(collection(db, "messages"), messageData);
-    setMessage("");
-    setIsTyping(false); // Reset typing status when the message is sent
+    if (selectedContact) {
+      await addDoc(collection(db, "messages"), {
+        text: newMessage,
+        uid: auth.currentUser?.uid,
+        receiverId: selectedContact.id,
+        createdAt: serverTimestamp(),
+      });
+      setNewMessage(""); // Clear input after sending
+    }
   };
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  const handleEmojiClick = (emojiData: EmojiClickData) => {
-    setMessage((prev) => prev + emojiData.emoji);
-    setShowEmojiPicker(false);
-  };
-
-  // Handle typing indicator update
-  const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setMessage(e.target.value);
-    setIsTyping(true);
-
-    // Reset typing status after a delay (500ms)
-    setTimeout(() => {
-      setIsTyping(false);
-    }, 500);
+  // Handle adding emoji
+  const handleEmojiSelect = (emoji: EmojiClickData) => {
+    setNewMessage((prevMessage) => prevMessage + emoji.emoji); // Use emoji.emoji correctly
   };
 
   return (
-    <div className="flex flex-col h-full px-4">
-      <div className="border-b pb-2 mb-4 flex justify-center items-center gap-2">
-        <MessageCircle className="text-blue-600" />
-        <h2 className="text-lg font-semibold">{selectedContact.name}</h2>
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="p-4 border-b bg-gray-100 text-xl font-semibold">
+        {selectedContact?.name || "Select a contact"}
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`max-w-xs break-words px-4 py-2 rounded-2xl shadow text-sm ${
-              msg.uid === user?.uid
-                ? "ml-auto bg-blue-100 text-right"
-                : "mr-auto bg-gray-200 text-left"
-            }`}
-          >
-            <div className="font-medium">{msg.name}</div>
-            <div>{msg.text}</div>
-            <div className="text-[10px] text-gray-500 mt-1">
-              {msg.createdAt?.toDate()?.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              }) || "Just now"}
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        {messages.map((msg) => {
+          const isSender = msg.uid === auth.currentUser?.uid;
+          const time = msg.createdAt
+            ? format(msg.createdAt.toDate(), "hh:mm a")
+            : "";
+
+          return (
+            <div
+              key={msg.id}
+              className={`flex ${isSender ? "justify-end" : "justify-start"}`}
+            >
+              <div
+                className={`max-w-xs px-4 py-2 rounded-lg shadow ${
+                  isSender
+                    ? "bg-blue-500 text-white rounded-br-none"
+                    : "bg-gray-200 text-black rounded-bl-none"
+                }`}
+              >
+                <p className="text-sm">{msg.text}</p>
+                <span className="block text-xs text-right mt-1 opacity-70">
+                  {time}
+                </span>
+              </div>
             </div>
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
+          );
+        })}
       </div>
 
-      {/* Typing Indicator */}
-      {isTyping && <div className="text-sm text-gray-500 mt-2">Typing...</div>}
+      {/* Emoji Picker and Typing Area */}
+      <div className="p-4 border-t bg-white">
+        <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+          <div
+            onClick={() => setShowEmojiPicker((prev) => !prev)}
+            className="cursor-pointer text-xl"
+          >
+            😀
+          </div>
 
-      <form onSubmit={sendMessage} className="mt-4 flex gap-2 items-center">
-        <input
-          value={message}
-          onChange={handleTyping} // Updated handler for typing indicator
-          placeholder="Type your message..."
-          className="flex-1 px-4 py-2 border rounded-full focus:outline-none shadow"
-        />
-        <button
-          type="button"
-          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-          className="px-2 py-2 bg-gray-200 rounded-full hover:bg-gray-300"
-        >
-          😊
-        </button>
-        <button
-          type="submit"
-          className="px-4 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition"
-        >
-          Send
-        </button>
-      </form>
+          <input
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Type a message"
+            className="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:ring"
+          />
+          <button
+            type="submit"
+            className="px-4 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600"
+          >
+            Send
+          </button>
+        </form>
 
-      {showEmojiPicker && (
-        <div className="absolute bottom-16 left-2 z-10">
-          <Picker onEmojiClick={handleEmojiClick} />
-        </div>
-      )}
+        {/* Emoji Picker */}
+        {showEmojiPicker && (
+          <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2">
+            <Picker onEmojiClick={handleEmojiSelect} /> {/* Picker usage */}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

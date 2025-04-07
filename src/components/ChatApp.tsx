@@ -1,4 +1,3 @@
-// src/components/ChatApp.tsx
 import React, { useState } from "react";
 import UserPanel from "./UserPanel";
 import ChatArea from "./ChatArea";
@@ -18,13 +17,14 @@ const ChatApp: React.FC = () => {
 
         {/* Center Chat */}
         <div className="w-3/5 overflow-y-auto">
-          {selectedContact ? (
-            <ChatArea selectedContact={selectedContact} />
-          ) : (
-            <div className="h-full flex items-center justify-center text-gray-500">
-              Select a contact to start chatting.
-            </div>
-          )}
+        {selectedContact ? (
+  <ChatArea selectedContact={selectedContact as Contact} />
+) : (
+  <div className="h-full flex items-center justify-center text-gray-500">
+    Select a contact to start chatting.
+  </div>
+)}
+
         </div>
 
         {/* Right Panel */}
