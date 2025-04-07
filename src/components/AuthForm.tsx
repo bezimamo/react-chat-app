@@ -1,17 +1,52 @@
 // src/components/AuthForm.tsx
 import React, { useState } from "react";
-import { signInWithPopup } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+} from "firebase/auth";
 import { auth, googleProvider } from "../firebase";
+import { useNavigate } from "react-router-dom";
+import { FcGoogle } from "react-icons/fc"; // <-- Google icon
 
 const AuthForm: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(true);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (isSignUp) {
+        await createUserWithEmailAndPassword(auth, email, password);
+        alert("Account created!");
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+        alert("Signed in!");
+      }
+      navigate("/chat");
+    } catch (error) {
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert("An unknown error occurred.");
+      }
+    }
+  };
 
   const handleGoogleSignIn = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
       alert("Signed in with Google!");
-    } catch (error: any) {
-      alert(error.message);
+      navigate("/chat");
+    } catch (error) {
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert("An unknown error occurred.");
+      }
     }
   };
 
@@ -22,11 +57,13 @@ const AuthForm: React.FC = () => {
           {isSignUp ? "Create Account" : "Welcome Back"}
         </h2>
 
-        <form className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {isSignUp && (
             <input
               type="text"
               placeholder="Username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"
             />
           )}
@@ -34,12 +71,16 @@ const AuthForm: React.FC = () => {
           <input
             type="email"
             placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"
           />
 
           <input
             type="password"
             placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"
           />
 
@@ -54,8 +95,9 @@ const AuthForm: React.FC = () => {
         {!isSignUp && (
           <button
             onClick={handleGoogleSignIn}
-            className="mt-4 w-full bg-red-500 text-white py-2 rounded-xl hover:bg-red-600 transition duration-300"
+            className="mt-4 w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-2 rounded-xl hover:shadow-md transition duration-300"
           >
+            <FcGoogle className="text-xl" />
             Sign In with Google
           </button>
         )}
@@ -63,7 +105,12 @@ const AuthForm: React.FC = () => {
         <p className="text-sm text-center mt-4">
           {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
           <button
-            onClick={() => setIsSignUp(!isSignUp)}
+            onClick={() => {
+              setIsSignUp(!isSignUp);
+              setUsername("");
+              setEmail("");
+              setPassword("");
+            }}
             className="text-blue-500 hover:underline font-medium"
           >
             {isSignUp ? "Sign In" : "Sign Up"}
