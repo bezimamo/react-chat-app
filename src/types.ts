@@ -7,6 +7,8 @@ export interface Contact {
   email?: string;  
     profilePic: string;
   photoURL?: string; 
+  userId: string;
+  username: string;
 }
 
 export interface Message {
@@ -16,3 +18,16 @@ export interface Message {
   receiverId: string;
   createdAt: Timestamp;
 }
+
+export interface FirestoreUser {
+  userId: string;
+  username: string;
+}
+// types.ts
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  photoURL?: string;
+}
+

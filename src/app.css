@@ -1,0 +1,23 @@
+/* Default Light Theme */
+html.light {
+    --bg-color: #f0f0f0;
+    --text-color: #333;
+    --button-bg: #f8f8f8;
+  }
+  
+  html.dark {
+    --bg-color: #1a202c;
+    --text-color: #fff;
+    --button-bg: #2d3748;
+  }
+  
+  /* Use these variables in your styles */
+  body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+  }
+  
+  button {
+    background-color: var(--button-bg);
+  }
+  

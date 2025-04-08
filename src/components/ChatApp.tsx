@@ -8,28 +8,42 @@ const ChatApp: React.FC = () => {
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
 
   return (
-    <div className="min-h-screen p-4 bg-gradient-to-r from-purple-100 to-blue-200 flex justify-center items-center">
-      <div className="w-full max-w-7xl h-[90vh] bg-white rounded-2xl shadow-xl flex overflow-hidden">
-        {/* Left Panel */}
-        <div className="w-1/5 bg-gray-50 border-r overflow-y-auto">
+    <div className="min-h-screen bg-gradient-to-r from-purple-100 to-blue-200 flex flex-col">
+      {/* Header */}
+      <header className="text-center py-4 text-3xl font-bold text-purple-800 shadow-md bg-white">
+        AwuraChat
+      </header>
+
+      <div className="flex flex-grow p-4">
+        {/* Left Panel - User List */}
+        <div className="w-1/5 bg-gray-50 border-r overflow-y-auto rounded-l-2xl">
           <UserPanel onSelectContact={setSelectedContact} />
         </div>
 
-        {/* Center Chat */}
-        <div className="w-3/5 overflow-y-auto">
-        {selectedContact ? (
-  <ChatArea selectedContact={selectedContact as Contact} />
-) : (
-  <div className="h-full flex items-center justify-center text-gray-500">
-    Select a contact to start chatting.
-  </div>
-)}
-
+        {/* Center Area */}
+        <div className="w-3/5 overflow-y-auto bg-white rounded-lg mx-2 shadow-inner">
+          {selectedContact ? (
+            <ChatArea
+              selectedContact={selectedContact}
+              onContactSelect={setSelectedContact}
+            />
+          ) : (
+            <div className="h-full flex flex-col justify-center items-center text-gray-500 text-center p-8">
+              <h2 className="text-2xl font-semibold mb-4">Welcome to AwuraChat</h2>
+              <p className="text-lg">Select a contact to start chatting.</p>
+            </div>
+          )}
         </div>
 
-        {/* Right Panel */}
-        <div className="w-1/5 bg-gray-50 overflow-y-auto">
-          <FriendDetail contact={selectedContact} />
+        {/* Right Panel - Friend Detail */}
+        <div className="w-1/5 bg-gray-50 overflow-y-auto rounded-r-2xl shadow-inner">
+          {selectedContact ? (
+            <FriendDetail contact={selectedContact} />
+          ) : (
+            <div className="h-full flex items-center justify-center text-gray-400 px-4">
+              Friend details will appear here.
+            </div>
+          )}
         </div>
       </div>
     </div>

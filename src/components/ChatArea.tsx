@@ -8,14 +8,14 @@ import {
   addDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { auth, db } from "../firebase"; // Adjust if your path is different
+import { auth, db } from "../firebase";
 import { format } from "date-fns";
-import { Message } from "../types"; // ✅ Use the interface you just added
-import { Contact } from "../types";
-import Picker, { EmojiClickData } from "emoji-picker-react"; // Import from emoji-picker-react
+import { Message, Contact } from "../types";
+import Picker, { EmojiClickData } from "emoji-picker-react";
 
 interface ChatAreaProps {
   selectedContact: Contact;
+  onContactSelect: (contact: Contact) => void;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({ selectedContact }) => {
@@ -25,8 +25,6 @@ const ChatArea: React.FC<ChatAreaProps> = ({ selectedContact }) => {
 
   // Fetch messages from Firestore
   useEffect(() => {
-    if (!selectedContact) return;
-
     const q = query(
       collection(db, "messages"),
       where("receiverId", "==", selectedContact.id),
@@ -61,31 +59,30 @@ const ChatArea: React.FC<ChatAreaProps> = ({ selectedContact }) => {
     e.preventDefault();
     if (newMessage.trim() === "") return;
 
-    if (selectedContact) {
-      await addDoc(collection(db, "messages"), {
-        text: newMessage,
-        uid: auth.currentUser?.uid,
-        receiverId: selectedContact.id,
-        createdAt: serverTimestamp(),
-      });
-      setNewMessage(""); // Clear input after sending
-    }
+    await addDoc(collection(db, "messages"), {
+      text: newMessage,
+      uid: auth.currentUser?.uid,
+      receiverId: selectedContact.id,
+      createdAt: serverTimestamp(),
+    });
+    setNewMessage("");
   };
 
   // Handle adding emoji
   const handleEmojiSelect = (emoji: EmojiClickData) => {
-    setNewMessage((prevMessage) => prevMessage + emoji.emoji); // Use emoji.emoji correctly
+    setNewMessage((prevMessage) => prevMessage + emoji.emoji);
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="p-4 border-b bg-gray-100 text-xl font-semibold">
-        {selectedContact?.name || "Select a contact"}
-      </div>
-
-      {/* Messages */}
+    <div className="flex flex-col h-full bg-gray-50">
+    
+      {/* Chat Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        <div className="bg-gray-200 p-4 rounded-lg shadow-lg mb-4">
+          <h3 className="text-xl font-semibold">{selectedContact.name}</h3>
+          <p className="text-sm text-gray-600">Online</p>
+        </div>
+
         {messages.map((msg) => {
           const isSender = msg.uid === auth.currentUser?.uid;
           const time = msg.createdAt
@@ -114,7 +111,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ selectedContact }) => {
         })}
       </div>
 
-      {/* Emoji Picker and Typing Area */}
+      {/* Input & Emoji Picker */}
       <div className="p-4 border-t bg-white">
         <form onSubmit={handleSendMessage} className="flex items-center gap-2">
           <div
@@ -138,10 +135,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ selectedContact }) => {
           </button>
         </form>
 
-        {/* Emoji Picker */}
         {showEmojiPicker && (
           <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2">
-            <Picker onEmojiClick={handleEmojiSelect} /> {/* Picker usage */}
+            <Picker onEmojiClick={handleEmojiSelect} />
           </div>
         )}
       </div>
