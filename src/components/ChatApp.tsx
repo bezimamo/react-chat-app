@@ -14,14 +14,14 @@ const ChatApp: React.FC = () => {
         AwuraChat
       </header>
 
-      <div className="flex flex-grow p-4">
+      <div className="flex flex-grow p-4 gap-2 md:flex-row flex-col">
         {/* Left Panel - User List */}
-        <div className="w-1/5 bg-gray-50 border-r overflow-y-auto rounded-l-2xl">
+        <div className="md:w-1/5 w-full bg-gray-50 border-r overflow-y-auto rounded-2xl md:rounded-l-2xl shadow-sm">
           <UserPanel onSelectContact={setSelectedContact} />
         </div>
 
         {/* Center Area */}
-        <div className="w-3/5 overflow-y-auto bg-white rounded-lg mx-2 shadow-inner">
+        <div className="md:w-3/5 w-full overflow-y-auto bg-white rounded-lg shadow-inner">
           {selectedContact ? (
             <ChatArea
               selectedContact={selectedContact}
@@ -36,7 +36,7 @@ const ChatApp: React.FC = () => {
         </div>
 
         {/* Right Panel - Friend Detail */}
-        <div className="w-1/5 bg-gray-50 overflow-y-auto rounded-r-2xl shadow-inner">
+        <div className="md:w-1/5 w-full bg-gray-50 overflow-y-auto rounded-2xl md:rounded-r-2xl shadow-inner">
           {selectedContact ? (
             <FriendDetail contact={selectedContact} />
           ) : (

@@ -9,6 +9,8 @@ export interface Contact {
   photoURL?: string; 
   userId: string;
   username: string;
+  lastSeen?: number; 
+  isOnline?: boolean;
 }
 
 export interface Message {
@@ -16,7 +18,7 @@ export interface Message {
   text: string;
   uid: string;
   receiverId: string;
-  createdAt: Timestamp;
+  createdAt: number; 
 }
 
 export interface FirestoreUser {
@@ -29,5 +31,7 @@ export interface User {
   name: string;
   email: string;
   photoURL?: string;
+  lastSeen?: number; 
+  isOnline?: boolean;
 }
 

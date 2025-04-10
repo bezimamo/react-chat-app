@@ -1,13 +1,12 @@
-// src/components/AuthForm.tsx
 import React, { useState } from "react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
 } from "firebase/auth";
-import { auth, googleProvider } from "../firebase";
+import { auth, googleProvider, addUserToRealtimeDB } from "../firebase";
 import { useNavigate } from "react-router-dom";
-import { FcGoogle } from "react-icons/fc"; // <-- Google icon
+import { FcGoogle } from "react-icons/fc";
 
 const AuthForm: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(true);
@@ -20,7 +19,8 @@ const AuthForm: React.FC = () => {
     e.preventDefault();
     try {
       if (isSignUp) {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const userCred = await createUserWithEmailAndPassword(auth, email, password);
+        await addUserToRealtimeDB(userCred.user.uid, username, email);
         alert("Account created!");
       } else {
         await signInWithEmailAndPassword(auth, email, password);
@@ -38,7 +38,9 @@ const AuthForm: React.FC = () => {
 
   const handleGoogleSignIn = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      await addUserToRealtimeDB(user.uid, user.displayName || "Google User", user.email || "");
       alert("Signed in with Google!");
       navigate("/chat");
     } catch (error) {
@@ -65,6 +67,7 @@ const AuthForm: React.FC = () => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"
+              required
             />
           )}
 
@@ -74,6 +77,7 @@ const AuthForm: React.FC = () => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"
+            required
           />
 
           <input
@@ -82,6 +86,7 @@ const AuthForm: React.FC = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"
+            required
           />
 
           <button
@@ -119,6 +124,5 @@ const AuthForm: React.FC = () => {
       </div>
     </div>
   );
-};
-
+}
 export default AuthForm;

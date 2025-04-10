@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { FaUserEdit, FaSearch, FaCog, FaSignOutAlt } from "react-icons/fa";
-import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "../firebase";
-import { getAuth, signOut, User } from "firebase/auth";
+import { FaUserEdit, FaSearch, FaSignOutAlt } from "react-icons/fa";
+import { rtdb } from "../firebase"; 
+import { getAuth, signOut } from "firebase/auth";
 import { Contact } from "../types";
 import { useNavigate } from "react-router-dom";
+import { onValue, ref } from "firebase/database";
 
 interface UserPanelProps {
   onSelectContact: (contact: Contact) => void;
@@ -13,38 +13,67 @@ interface UserPanelProps {
 const UserPanel: React.FC<UserPanelProps> = ({ onSelectContact }) => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [user, setUser] = useState<User | null>(null);
+  const [currentUserName, setCurrentUserName] = useState<string>("");
 
   const auth = getAuth();
   const navigate = useNavigate();
 
-  // Get current user info
+  // Fetch current user name from Realtime Database
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(setUser);
-    return () => unsubscribe();
-  }, []);
-
-  // Fetch contacts in real-time from Firestore
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "contacts"), (snapshot) => {
-      const contactList = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Contact[];
-      setContacts(contactList);
+    const currentUserRef = ref(rtdb, `users/${auth.currentUser?.uid}`);
+    const unsubscribe = onValue(currentUserRef, (snapshot) => {
+      const data = snapshot.val();
+      setCurrentUserName(data?.displayName || data?.username || "Unnamed");
     });
+
+    return () => unsubscribe();
+  }, [auth.currentUser?.uid]);
+
+  // Fetch contacts and filter out the current user
+  useEffect(() => {
+    const contactsRef = ref(rtdb, "users");
+    const unsubscribe = onValue(contactsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const contactList = Object.entries(data).map(([id, value]: any) => ({
+          id,
+          name: value.displayName || value.username || "Unnamed",
+          isOnline: value.isOnline || false,
+          lastSeen: value.lastSeen || null,
+          email: value.email || "",
+          
+        })) as Contact[];
+
+        setContacts(contactList);
+      } else {
+        setContacts([]);
+      }
+    });
+
     return () => unsubscribe();
   }, []);
 
-  // Filter contacts based on search term
-  const filteredContacts = contacts.filter((contact) =>
-    contact.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredContacts = contacts
+    .filter((contact) => contact.id !== auth.currentUser?.uid)
+    .filter((contact) =>
+      contact.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
-  // Handle logout
   const handleLogout = async () => {
     await signOut(auth);
     navigate("/");
+  };
+
+  const formatLastSeen = (timestamp: number | null | undefined) => {
+    if (!timestamp) return "Last seen unknown";
+    const diff = Date.now() - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return "Just now";
+    if (minutes < 60) return `Last seen ${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `Last seen ${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `Last seen ${days}d ago`;
   };
 
   return (
@@ -56,7 +85,7 @@ const UserPanel: React.FC<UserPanelProps> = ({ onSelectContact }) => {
         </div>
         <div>
           <h2 className="text-lg font-bold text-gray-800 dark:text-white">
-            {user?.displayName || "User"}
+            {currentUserName}
           </h2>
           <p className="text-sm text-green-500">Online</p>
         </div>
@@ -82,26 +111,26 @@ const UserPanel: React.FC<UserPanelProps> = ({ onSelectContact }) => {
             onClick={() => onSelectContact(contact)}
             className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-800 transition-shadow shadow-sm dark:shadow-none"
           >
-            <div className="w-16 h-12 flex items-center justify-center rounded-full bg-gray-500 text-white">
+            <div className="w-16 h-12 flex items-center justify-center rounded-full bg-gray-500 text-white relative">
               <FaUserEdit size={28} />
+              <span
+                className={`absolute bottom-0 right-1 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900 ${
+                  contact.isOnline ? "bg-green-400" : "bg-gray-400"
+                }`}
+              ></span>
             </div>
             <div className="flex flex-col">
               <h4 className="text-sm font-semibold text-gray-800 dark:text-white">
                 {contact.name}
               </h4>
-              <p className="text-xs text-gray-400 dark:text-gray-500 italic">
-                {contact.email || "No messages yet"}
+              <p className="text-xs text-gray-500 italic">
+                {contact.isOnline
+                  ? "Online"
+                  : formatLastSeen(contact.lastSeen)}
               </p>
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Settings Button */}
-      <div className="relative">
-        <button className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition">
-          <FaCog size={20} />
-        </button>
       </div>
 
       {/* Logout Button */}

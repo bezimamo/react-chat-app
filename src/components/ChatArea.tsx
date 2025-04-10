@@ -1,14 +1,6 @@
 import { useEffect, useState } from "react";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  addDoc,
-  serverTimestamp,
-} from "firebase/firestore";
-import { auth, db } from "../firebase";
+import { ref, onValue, push } from "firebase/database";
+import { auth, rtdb } from "../firebase";
 import { format } from "date-fns";
 import { Message, Contact } from "../types";
 import Picker, { EmojiClickData } from "emoji-picker-react";
@@ -23,33 +15,22 @@ const ChatArea: React.FC<ChatAreaProps> = ({ selectedContact }) => {
   const [newMessage, setNewMessage] = useState<string>("");
   const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
 
-  // Fetch messages from Firestore
+  // Fetch messages from Realtime Database
   useEffect(() => {
-    const q = query(
-      collection(db, "messages"),
-      where("receiverId", "==", selectedContact.id),
-      orderBy("createdAt", "asc")
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const messages: Message[] = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            text: data.text,
-            uid: data.uid,
-            receiverId: data.receiverId,
-            createdAt: data.createdAt,
-          };
-        });
-        setMessages(messages);
-      },
-      (error) => {
-        console.error("Error loading messages:", error);
-      }
-    );
+    const messagesRef = ref(rtdb, `messages/${auth.currentUser?.uid}_${selectedContact.id}`);
+    const unsubscribe = onValue(messagesRef, (snapshot) => {
+      const data = snapshot.val();
+      const msgs: Message[] = data
+        ? Object.entries(data).map(([key, val]: any) => ({
+            id: key,
+            text: val.text,
+            uid: val.uid,
+            receiverId: val.receiverId,
+            createdAt: val.createdAt,
+          }))
+        : [];
+      setMessages(msgs);
+    });
 
     return () => unsubscribe();
   }, [selectedContact]);
@@ -58,15 +39,29 @@ const ChatArea: React.FC<ChatAreaProps> = ({ selectedContact }) => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newMessage.trim() === "") return;
-
-    await addDoc(collection(db, "messages"), {
+  
+    const message = {
       text: newMessage,
       uid: auth.currentUser?.uid,
       receiverId: selectedContact.id,
-      createdAt: serverTimestamp(),
-    });
+      createdAt: Date.now(),
+    };
+  
+    const senderId = auth.currentUser?.uid;
+    const receiverId = selectedContact.id;
+  
+    // Push to both users' chat paths
+    const senderRef = ref(rtdb, `messages/${senderId}_${receiverId}`);
+    const receiverRef = ref(rtdb, `messages/${receiverId}_${senderId}`);
+  
+    await Promise.all([
+      push(senderRef, message),
+      push(receiverRef, message),
+    ]);
+  
     setNewMessage("");
   };
+  
 
   // Handle adding emoji
   const handleEmojiSelect = (emoji: EmojiClickData) => {
@@ -75,18 +70,18 @@ const ChatArea: React.FC<ChatAreaProps> = ({ selectedContact }) => {
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
-    
-      {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        <div className="bg-gray-200 p-4 rounded-lg shadow-lg mb-4">
-          <h3 className="text-xl font-semibold">{selectedContact.name}</h3>
-          <p className="text-sm text-gray-600">Online</p>
-        </div>
+      {/* Chat Header */}
+      <div className="bg-gray-200 p-4 rounded-lg shadow-lg mb-4">
+        <h3 className="text-xl font-semibold">{selectedContact.name}</h3>
+        <p className="text-sm text-gray-600">Online</p>
+      </div>
 
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-2">
         {messages.map((msg) => {
           const isSender = msg.uid === auth.currentUser?.uid;
           const time = msg.createdAt
-            ? format(msg.createdAt.toDate(), "hh:mm a")
+            ? format(new Date(msg.createdAt), "hh:mm a")
             : "";
 
           return (
@@ -136,7 +131,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ selectedContact }) => {
         </form>
 
         {showEmojiPicker && (
-          <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2">
+          <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-50">
             <Picker onEmojiClick={handleEmojiSelect} />
           </div>
         )}
