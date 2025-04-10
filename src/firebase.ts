@@ -21,12 +21,22 @@ export const googleProvider = new GoogleAuthProvider();
 export const rtdb = getDatabase(app);
 
 // Add user to Realtime Database
-export const addUserToRealtimeDB = async (userId: string, name: string, email: string) => {
+export const addUserToRealtimeDB = async (
+  userId: string,
+  name: string,
+  email: string,
+  photoURL: string,
+  username: string
+) => {
   try {
     await set(rtdbRef(rtdb, `users/${userId}`), {
-      name,       // Changed key from 'username' to 'name'
+      userId,
+      name,
+      username,
       email,
+      photoURL,
       isOnline: true,
+      lastSeen: Date.now(),
     });
   } catch (error) {
     console.error("Error adding user to Realtime Database:", error);

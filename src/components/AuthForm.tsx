@@ -20,7 +20,13 @@ const AuthForm: React.FC = () => {
     try {
       if (isSignUp) {
         const userCred = await createUserWithEmailAndPassword(auth, email, password);
-        await addUserToRealtimeDB(userCred.user.uid, username, email);
+        await addUserToRealtimeDB(
+          userCred.user.uid,
+          username,
+          email,
+          userCred.user.photoURL || "",
+          username
+        );
         alert("Account created!");
       } else {
         await signInWithEmailAndPassword(auth, email, password);
@@ -40,7 +46,13 @@ const AuthForm: React.FC = () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-      await addUserToRealtimeDB(user.uid, user.displayName || "Google User", user.email || "");
+      await addUserToRealtimeDB(
+        user.uid,
+        user.displayName || user.email?.split("@")[0] || "google-user",
+        user.email || "",
+        user.photoURL || "",
+        user.displayName || ""
+      );
       alert("Signed in with Google!");
       navigate("/chat");
     } catch (error) {
@@ -124,5 +136,6 @@ const AuthForm: React.FC = () => {
       </div>
     </div>
   );
-}
+};
+
 export default AuthForm;

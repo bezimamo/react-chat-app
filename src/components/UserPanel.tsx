@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { FaUserEdit, FaSearch, FaSignOutAlt } from "react-icons/fa";
+import { FaUserCircle, FaSearch, FaSignOutAlt } from "react-icons/fa";
 import { rtdb } from "../firebase"; 
 import { getAuth, signOut } from "firebase/auth";
 import { Contact } from "../types";
@@ -14,22 +14,23 @@ const UserPanel: React.FC<UserPanelProps> = ({ onSelectContact }) => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentUserName, setCurrentUserName] = useState<string>("");
+  const [currentUserPhoto, setCurrentUserPhoto] = useState<string>("");
 
   const auth = getAuth();
   const navigate = useNavigate();
 
-  // Fetch current user name from Realtime Database
   useEffect(() => {
     const currentUserRef = ref(rtdb, `users/${auth.currentUser?.uid}`);
     const unsubscribe = onValue(currentUserRef, (snapshot) => {
       const data = snapshot.val();
-      setCurrentUserName(data?.displayName || data?.username || "Unnamed");
+      console.log("Current user data:", data);
+      setCurrentUserName(data?.username || data?.name || data?.email || "User");
+      setCurrentUserPhoto(data?.photoURL || "");
     });
 
     return () => unsubscribe();
   }, [auth.currentUser?.uid]);
 
-  // Fetch contacts and filter out the current user
   useEffect(() => {
     const contactsRef = ref(rtdb, "users");
     const unsubscribe = onValue(contactsRef, (snapshot) => {
@@ -37,11 +38,11 @@ const UserPanel: React.FC<UserPanelProps> = ({ onSelectContact }) => {
       if (data) {
         const contactList = Object.entries(data).map(([id, value]: any) => ({
           id,
-          name: value.displayName || value.username || "Unnamed",
+          name: value.username || value.name || value.email || "Unnamed",
           isOnline: value.isOnline || false,
           lastSeen: value.lastSeen || null,
-          email: value.email || "",
-          
+          email: value.email || "", 
+          photoURL: value.photoURL || "",
         })) as Contact[];
 
         setContacts(contactList);
@@ -80,8 +81,16 @@ const UserPanel: React.FC<UserPanelProps> = ({ onSelectContact }) => {
     <div className="flex flex-col h-full px-4 py-4 space-y-6 bg-gray-50 dark:bg-gray-900 transition-all duration-300">
       {/* Profile Section */}
       <div className="flex items-center gap-4">
-        <div className="w-16 h-16 flex items-center justify-center rounded-full bg-gray-500 text-white">
-          <FaUserEdit size={32} />
+        <div className="w-16 h-16 flex items-center justify-center rounded-full bg-purple-500 text-white overflow-hidden">
+          {currentUserPhoto ? (
+            <img
+              src={currentUserPhoto}
+              alt="Profile"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <FaUserCircle size={40} />
+          )}
         </div>
         <div>
           <h2 className="text-lg font-bold text-gray-800 dark:text-white">
@@ -111,8 +120,16 @@ const UserPanel: React.FC<UserPanelProps> = ({ onSelectContact }) => {
             onClick={() => onSelectContact(contact)}
             className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-800 transition-shadow shadow-sm dark:shadow-none"
           >
-            <div className="w-16 h-12 flex items-center justify-center rounded-full bg-gray-500 text-white relative">
-              <FaUserEdit size={28} />
+            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-purple-500 text-white relative overflow-hidden">
+              {contact.photoURL ? (
+                <img
+                  src={contact.photoURL}
+                  alt={contact.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <FaUserCircle size={28} />
+              )}
               <span
                 className={`absolute bottom-0 right-1 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900 ${
                   contact.isOnline ? "bg-green-400" : "bg-gray-400"
