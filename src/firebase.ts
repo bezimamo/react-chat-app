@@ -1,7 +1,14 @@
 // src/firebase.ts
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getDatabase, ref as rtdbRef, set } from "firebase/database";
+import {
+  getDatabase,
+  ref as rtdbRef,
+  set,
+  onDisconnect,
+  onValue,
+  update,
+} from "firebase/database";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -10,7 +17,7 @@ const firebaseConfig = {
   projectId: "chat-app-10384",
   storageBucket: "chat-app-10384.appspot.com",
   messagingSenderId: "19285349661",
-  appId: "1:19285349661:web:7e7d776a0ca377613c7df4"
+  appId: "1:19285349661:web:7e7d776a0ca377613c7df4",
 };
 
 // Initialize Firebase
@@ -20,25 +27,44 @@ export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const rtdb = getDatabase(app);
 
-// Add user to Realtime Database
+// ✅ Function to add a user to Realtime Database
 export const addUserToRealtimeDB = async (
-  userId: string,
-  name: string,
+  uid: string,
+  username: string,
   email: string,
   photoURL: string,
-  username: string
+  name: string
 ) => {
-  try {
-    await set(rtdbRef(rtdb, `users/${userId}`), {
-      userId,
-      name,
-      username,
-      email,
-      photoURL,
+  const userRef = rtdbRef(rtdb, `users/${uid}`);
+  await set(userRef, {
+    userId: uid,
+    username,
+    email,
+    photoURL,
+    name,
+    isOnline: true,
+    lastSeen: null,
+  });
+};
+
+// ✅ Function to set online status and update on disconnect
+export const setupOnlineStatus = (userId: string) => {
+  const userRef = rtdbRef(rtdb, `users/${userId}`);
+  const connectedRef = rtdbRef(rtdb, ".info/connected");
+
+  onValue(connectedRef, (snapshot) => {
+    if (snapshot.val() === false) return;
+
+    // Set onDisconnect: set offline and update lastSeen
+    onDisconnect(userRef).update({
+      isOnline: false,
+      lastSeen: Date.now(),
+    });
+
+    // Set online now
+    update(userRef, {
       isOnline: true,
       lastSeen: Date.now(),
     });
-  } catch (error) {
-    console.error("Error adding user to Realtime Database:", error);
-  }
+  });
 };

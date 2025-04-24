@@ -33,12 +33,8 @@ const AuthForm: React.FC = () => {
         alert("Signed in!");
       }
       navigate("/chat");
-    } catch (error) {
-      if (error instanceof Error) {
-        alert(error.message);
-      } else {
-        alert("An unknown error occurred.");
-      }
+    } catch (error: any) {
+      alert(error.message || "Something went wrong");
     }
   };
 
@@ -55,12 +51,8 @@ const AuthForm: React.FC = () => {
       );
       alert("Signed in with Google!");
       navigate("/chat");
-    } catch (error) {
-      if (error instanceof Error) {
-        alert(error.message);
-      } else {
-        alert("An unknown error occurred.");
-      }
+    } catch (error: any) {
+      alert(error.message || "Google sign-in failed");
     }
   };
 
@@ -78,57 +70,50 @@ const AuthForm: React.FC = () => {
               placeholder="Username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"
+              className="w-full px-4 py-2 border rounded-md"
               required
             />
           )}
-
           <input
             type="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className="w-full px-4 py-2 border rounded-md"
             required
           />
-
           <input
             type="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className="w-full px-4 py-2 border rounded-md"
             required
           />
-
           <button
             type="submit"
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-xl font-semibold"
+            className="w-full py-2 bg-blue-500 text-white font-bold rounded-md hover:bg-blue-600"
           >
             {isSignUp ? "Sign Up" : "Sign In"}
           </button>
         </form>
 
-        {!isSignUp && (
+        <div className="my-4 flex justify-center items-center gap-2">
+          <span className="text-gray-500">or</span>
           <button
             onClick={handleGoogleSignIn}
-            className="mt-4 w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-2 rounded-xl hover:shadow-md transition duration-300"
+            className="flex items-center gap-2 border border-gray-300 rounded-md px-4 py-2"
           >
-            <FcGoogle className="text-xl" />
-            Sign In with Google
+            <FcGoogle />
+            Google Sign-In
           </button>
-        )}
+        </div>
 
-        <p className="text-sm text-center mt-4">
-          {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
+        <p className="text-center text-sm text-gray-600">
+          {isSignUp ? "Already have an account?" : "Don't have an account?"}
           <button
-            onClick={() => {
-              setIsSignUp(!isSignUp);
-              setUsername("");
-              setEmail("");
-              setPassword("");
-            }}
-            className="text-blue-500 hover:underline font-medium"
+            className="text-blue-500 font-medium ml-2"
+            onClick={() => setIsSignUp(!isSignUp)}
           >
             {isSignUp ? "Sign In" : "Sign Up"}
           </button>

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { FaUserCircle, FaSearch, FaSignOutAlt } from "react-icons/fa";
-import { rtdb } from "../firebase"; 
-import { getAuth, signOut } from "firebase/auth";
+import { FaSearch, FaSignOutAlt } from "react-icons/fa";
+import { rtdb } from "../firebase";
+import { getAuth, onAuthStateChanged, signOut, updateProfile } from "firebase/auth";
 import { Contact } from "../types";
 import { useNavigate } from "react-router-dom";
-import { onValue, ref } from "firebase/database";
+import { onValue, ref, set, update } from "firebase/database";
 
 interface UserPanelProps {
   onSelectContact: (contact: Contact) => void;
@@ -13,24 +13,74 @@ interface UserPanelProps {
 const UserPanel: React.FC<UserPanelProps> = ({ onSelectContact }) => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentUserName, setCurrentUserName] = useState<string>("");
-  const [currentUserPhoto, setCurrentUserPhoto] = useState<string>("");
+  const [currentUserName, setCurrentUserName] = useState<string>("User");
+  const [currentUserPhoto, setCurrentUserPhoto] = useState<string | null>(null);
 
   const auth = getAuth();
   const navigate = useNavigate();
 
+  // Wait for auth state and set user info
   useEffect(() => {
-    const currentUserRef = ref(rtdb, `users/${auth.currentUser?.uid}`);
-    const unsubscribe = onValue(currentUserRef, (snapshot) => {
-      const data = snapshot.val();
-      console.log("Current user data:", data);
-      setCurrentUserName(data?.username || data?.name || data?.email || "User");
-      setCurrentUserPhoto(data?.photoURL || "");
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        const userRef = ref(rtdb, `users/${user.uid}`);
+
+        // If displayName is missing (like for email/password signup), set it manually
+        if (!user.displayName) {
+          const emailName = user.email?.split("@")[0] || "User";
+          updateProfile(user, {
+            displayName: emailName,
+          }).then(() => {
+            set(userRef, {
+              isOnline: true,
+              lastSeen: null,
+              name: emailName,
+              email: user.email || "",
+              photoURL: user.photoURL || null,
+            });
+          });
+        } else {
+          set(userRef, {
+            isOnline: true,
+            lastSeen: null,
+            name: user.displayName,
+            email: user.email || "",
+            photoURL: user.photoURL || null,
+          });
+        }
+
+        // Listen for updates to current user data
+        onValue(userRef, (snapshot) => {
+          const data = snapshot.val();
+          setCurrentUserName(data?.name || user.displayName || "User");
+          setCurrentUserPhoto(data?.photoURL || null);
+        });
+      }
     });
 
-    return () => unsubscribe();
+    return () => unsubscribeAuth();
+  }, []);
+
+  // Update presence (online/offline)
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const userRef = ref(rtdb, `users/${user.uid}`);
+    update(userRef, {
+      isOnline: true,
+      lastSeen: null,
+    });
+
+    return () => {
+      update(userRef, {
+        isOnline: false,
+        lastSeen: Date.now(),
+      });
+    };
   }, [auth.currentUser?.uid]);
 
+  // Load all contacts
   useEffect(() => {
     const contactsRef = ref(rtdb, "users");
     const unsubscribe = onValue(contactsRef, (snapshot) => {
@@ -38,10 +88,10 @@ const UserPanel: React.FC<UserPanelProps> = ({ onSelectContact }) => {
       if (data) {
         const contactList = Object.entries(data).map(([id, value]: any) => ({
           id,
-          name: value.username || value.name || value.email || "Unnamed",
+          name: value.name || value.email || "Unnamed",
           isOnline: value.isOnline || false,
           lastSeen: value.lastSeen || null,
-          email: value.email || "", 
+          email: value.email || "",
           photoURL: value.photoURL || "",
         })) as Contact[];
 
@@ -77,20 +127,27 @@ const UserPanel: React.FC<UserPanelProps> = ({ onSelectContact }) => {
     return `Last seen ${days}d ago`;
   };
 
+  const renderProfile = (photoURL: string | null, name: string) => {
+    if (photoURL) {
+      return (
+        <img
+          src={photoURL}
+          alt="Profile"
+          className="w-full h-full object-cover"
+        />
+      );
+    } else {
+      const firstLetter = name?.charAt(0).toUpperCase() || "U";
+      return <span className="text-xl font-bold">{firstLetter}</span>;
+    }
+  };
+
   return (
-    <div className="flex flex-col h-full px-4 py-4 space-y-6 bg-gray-50 dark:bg-gray-900 transition-all duration-300">
+    <div className="flex flex-col h-full max-h-screen w-full px-4 py-4 bg-gray-50 dark:bg-gray-900 overflow-hidden">
       {/* Profile Section */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 mb-4">
         <div className="w-16 h-16 flex items-center justify-center rounded-full bg-purple-500 text-white overflow-hidden">
-          {currentUserPhoto ? (
-            <img
-              src={currentUserPhoto}
-              alt="Profile"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <FaUserCircle size={40} />
-          )}
+          {renderProfile(currentUserPhoto, currentUserName)}
         </div>
         <div>
           <h2 className="text-lg font-bold text-gray-800 dark:text-white">
@@ -101,7 +158,7 @@ const UserPanel: React.FC<UserPanelProps> = ({ onSelectContact }) => {
       </div>
 
       {/* Search Box */}
-      <div className="relative">
+      <div className="relative mb-4">
         <input
           type="text"
           value={searchTerm}
@@ -112,9 +169,9 @@ const UserPanel: React.FC<UserPanelProps> = ({ onSelectContact }) => {
         <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-300" />
       </div>
 
-      {/* Contacts List */}
-      <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-        {filteredContacts.map((contact) => (
+      {/* Scrollable Contacts List */}
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-purple-400 scrollbar-track-transparent">
+  {filteredContacts.map((contact) => (
           <div
             key={contact.id}
             onClick={() => onSelectContact(contact)}
@@ -128,7 +185,9 @@ const UserPanel: React.FC<UserPanelProps> = ({ onSelectContact }) => {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <FaUserCircle size={28} />
+                <span className="text-xs font-semibold">
+                  {contact.name?.charAt(0).toUpperCase() || "U"}
+                </span>
               )}
               <span
                 className={`absolute bottom-0 right-1 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900 ${
@@ -151,13 +210,15 @@ const UserPanel: React.FC<UserPanelProps> = ({ onSelectContact }) => {
       </div>
 
       {/* Logout Button */}
-      <button
-        onClick={handleLogout}
-        className="w-full py-3 rounded-xl bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center gap-2 font-semibold transition"
-      >
-        <FaSignOutAlt />
-        Logout
-      </button>
+      <div className="mt-4">
+        <button
+          onClick={handleLogout}
+          className="w-full py-3 rounded-xl bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center gap-2 font-semibold transition"
+        >
+          <FaSignOutAlt />
+          Logout
+        </button>
+      </div>
     </div>
   );
 };

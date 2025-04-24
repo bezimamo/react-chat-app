@@ -1,13 +1,12 @@
-
 export interface Contact {
   id: string;
   name: string;
-  email?: string;  
-    profilePic: string;
-  photoURL?: string; 
+  email?: string;
+  profilePic?: string;
+  photoURL?: string;
   userId: string;
   username: string;
-  lastSeen?: number; 
+  lastSeen?: number;
   isOnline?: boolean;
 }
 
@@ -16,20 +15,19 @@ export interface Message {
   text: string;
   uid: string;
   receiverId: string;
-  createdAt: number; 
+  createdAt: number;
 }
 
 export interface FirestoreUser {
   userId: string;
   username: string;
 }
-// types.ts
+
 export interface User {
   id: string;
   name: string;
   email: string;
   photoURL?: string;
-  lastSeen?: number; 
+  lastSeen?: number | null;
   isOnline?: boolean;
 }
-
